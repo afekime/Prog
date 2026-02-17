@@ -3,33 +3,24 @@ from datetime import date, datetime
 from dataclasses import dataclass
 from platform import release
 
-
 @dataclass
 class Phone:
-    name: str
-    release_date: date
-    ram_capability: int
+    name: object
+    release_date: object
+    ram_capability: object
 
-def parse(line: str):
-    tokens = re.findall(r'"[^"]*"|\S+', line)
+def build_obj(line: str):
+    first_sim = line.find('"')
+    last_sim = line.find('"', first_sim+1)
 
-    if "Phone" in tokens:
-        tokens.remove("Phone")
+    line_rest = line[last_sim+1:].split()
 
-    name = None
-    release_date = None
-    ram_capability = None
+    name = line[first_sim + 1:last_sim]
+    release_date = line_rest[0]
+    ram_capability = line_rest[1]
 
-    for i in tokens:
-        if i.startswith('"') and i.endswith('"'):
-            name = i[1:-1]
-        elif re.fullmatch(r'\d{4}\.\d{2}\.\d{2}', i):
-            release_date = datetime.strptime(i, "%Y.%m.%d").date()
-        elif re.fullmatch(r'\d+', i):
-            ram_capability = int(i)
     return Phone(name, release_date, ram_capability)
 
 line = input()
-obj = parse(line)
-
-print(f"{obj} \nНазвание:{obj.name} \nДата выпуска:{obj.release_date} \nОбъем ОЗУ:{obj.ram_capability} Гб")
+obj = build_obj(line)
+print(obj)
