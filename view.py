@@ -1,18 +1,21 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from model import PhoneParseError
 from file_manager import PhoneFileManager
+from command_processor import CommandParser, CommandExecutor, CommandError
 
 
 class PhoneApp:
-    def __init__(self, objects, filename: str, repository: PhoneFileManager):
+    def __init__(self, objects: list, filename: str, repository: PhoneFileManager):
         self.objects = objects
         self.filename = filename
         self.repository = repository
+        self.command_parser = CommandParser()
+        self.command_executor = CommandExecutor(repository)
 
         self.root = tk.Tk()
         self.root.title("Список телефонов")
-        self.root.geometry("500x420+500+200")
+        self.root.geometry("500x500+500+200")
         self.root.resizable(False, False)
 
         tk.Label(self.root, text="Список объектов:").pack()
@@ -33,12 +36,7 @@ class PhoneApp:
 
         self.table.pack(pady=5)
 
-        for obj in self.objects:
-            self.table.insert(
-                "",
-                tk.END,
-                values=(obj.name, obj.release_date, obj.ram_capability)
-            )
+        self._refresh_table()
 
         tk.Label(self.root, text="Введите название:").pack()
         self.name_entry = tk.Entry(self.root, width=40)
@@ -52,8 +50,12 @@ class PhoneApp:
         self.ram_entry = tk.Entry(self.root, width=40)
         self.ram_entry.pack()
 
-        tk.Button(self.root, text="Добавить объект", command=self.add_obj).pack(pady=5)
-        tk.Button(self.root, text="Удалить выделенный объект", command=self.delete_obj).pack(pady=5)
+        tk.Button(self.root, text="Добавить объект",
+                  command=self.add_obj).pack(pady=5)
+        tk.Button(self.root, text="Удалить выделенный объект",
+                  command=self.delete_obj).pack(pady=2)
+        tk.Button(self.root, text="Загрузить файл команд",
+                  command=self.load_commands).pack(pady=5)
 
     def add_obj(self):
         try:
@@ -68,8 +70,7 @@ class PhoneApp:
 
         self.objects.append(obj)
         self.table.insert(
-            "",
-            tk.END,
+            "", tk.END,
             values=(obj.name, obj.release_date, obj.ram_capability)
         )
         self.repository.save_to_file(self.filename, self.objects)
@@ -89,6 +90,33 @@ class PhoneApp:
         self.table.delete(item)
         del self.objects[index]
         self.repository.save_to_file(self.filename, self.objects)
+
+    def load_commands(self):
+        cmd_filename = filedialog.askopenfilename(
+            title="Выберите файл команд",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        if not cmd_filename:
+            return
+
+        try:
+            commands = self.command_parser.load_from_file(
+                cmd_filename, self.repository.logger
+            )
+            self.objects = self.command_executor.execute_all(self.objects, commands)
+            self._refresh_table()
+        except (CommandError, PhoneParseError, OSError) as error:
+            messagebox.showerror("Ошибка при выполнении команд", str(error))
+
+    def _refresh_table(self):
+        """Перерисовывает таблицу из self.objects."""
+        for item in self.table.get_children():
+            self.table.delete(item)
+        for obj in self.objects:
+            self.table.insert(
+                "", tk.END,
+                values=(obj.name, obj.release_date, obj.ram_capability)
+            )
 
     def run(self):
         self.root.mainloop()
